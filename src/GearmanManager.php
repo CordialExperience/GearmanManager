@@ -341,11 +341,23 @@ abstract class GearmanManager {
                  *  Cancel that, we'll actually let them finish
                  */
                 if (!empty($this->children)) {
+                    $extremely_long_children = 0;
                     foreach ($this->children as $pid => $child) {
                         if (!empty($child['start_time']) && time() - $child['start_time'] > $this->max_run_time * 1.5) {
-                            $this->child_status_monitor($pid, $child["job"], "killed");
+                            if (!empty($child['start_time']) && time() - $child['start_time'] > $this->max_run_time * 10) {
+                                $extremely_long_children++;
+                                if( rand(0,1) ) {
+                                    $this->child_status_monitor($pid, $child["job"], "killed");
+                                }
+                            }
+                            else {
+                                $this->child_status_monitor($pid, $child["job"], "killed");
+                            }
                             //posix_kill($pid, SIGKILL);
                         }
+                    }
+                    if( $extremely_long_children ) {
+                        usleep(250000);//sleep quarter second to slow the log spam from zombies
                     }
                 }
             }
@@ -1209,7 +1221,7 @@ abstract class GearmanManager {
     protected function child_status_monitor($pid, $jobs, $status) {
         switch ($status) {
             case "killed":
-                $message = "Child $pid has been running too long. Forcibly killing process. (".implode(",", $jobs).")";
+                $message = "- $pid v-old/FKillng:".implode(",", $jobs);
                 break;
             case "exited":
                 $message = "Child $pid exited cleanly. (".implode(",", $jobs).")";
